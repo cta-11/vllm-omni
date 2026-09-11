@@ -104,9 +104,7 @@ class CacheBackend(ABC):
     # transparently by the runner without isinstance() checks.
     # ------------------------------------------------------------------
 
-    def short_circuit_requests(
-        self, reqs: list, target_device: Any
-    ) -> tuple[list, list]:
+    def short_circuit_requests(self, reqs: list, target_device: Any) -> tuple[list, list]:
         """Inspect requests before forward; return (hit_outputs, remaining_reqs).
 
         hit_outputs is a list of (original_index, DiffusionOutput) tuples for
@@ -129,9 +127,7 @@ class CacheBackend(ABC):
         """
         return outputs
 
-    def merge_hit_outputs(
-        self, outputs: list, hit_outputs: list
-    ) -> list:
+    def merge_hit_outputs(self, outputs: list, hit_outputs: list) -> list:
         """Merge cache-hit outputs back into the computed outputs list.
 
         hit_outputs is a list of (original_index, DiffusionOutput). Default:

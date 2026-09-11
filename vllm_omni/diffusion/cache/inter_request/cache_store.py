@@ -102,7 +102,7 @@ class DiTCacheStore:
         # manages CPU→Disk tiering + LRU internally). On CPU eviction the entry's
         # latents are set to None (lightweight shell kept for semantic_search);
         # a subsequent get() recovers them from LMCache via engine.get().
-        self._lmcache = lmcache_engine           # for step latents (8MB each)
+        self._lmcache = lmcache_engine  # for step latents (8MB each)
         self._lmcache_steps = lmcache_steps_engine  # same as _lmcache (backward compat)
 
         # Final latent (185MB) uses direct torch.save to disk (async thread)
@@ -239,8 +239,7 @@ class DiTCacheStore:
         Without LMCache, the entry is discarded entirely (original behaviour).
         """
         while len(self._store) >= self._max_entries or (
-            self._current_memory_bytes + required_bytes > self._max_memory_bytes
-            and len(self._store) > 0
+            self._current_memory_bytes + required_bytes > self._max_memory_bytes and len(self._store) > 0
         ):
             # Find the oldest entry that still has heavy data in CPU.
             oldest_key = None
@@ -343,11 +342,10 @@ class DiTCacheStore:
             # Step latents (8MB each): LMCache (small data, fast async write).
             if self._final_disk_dir is not None:
                 # Async write final latent to disk
-                self._final_write_executor.submit(
-                    self._save_final_to_disk, key_hash, cached_latents
-                )
+                self._final_write_executor.submit(self._save_final_to_disk, key_hash, cached_latents)
             if self._lmcache is not None or self._lmcache_steps is not None:
                 import torch.distributed as dist
+
                 if dist.is_initialized():
                     time.sleep(dist.get_rank() * 0.5)
                 # Step latents go to LMCache (small 8MB tensors)
@@ -360,8 +358,12 @@ class DiTCacheStore:
                     )
                 if steps_engine is not None:
                     self._lmcache_put_entry_with_lock(
-                        key_hash, cached_latents, cached_step_latents, meta_pairs,
-                        final_engine=None, steps_engine=steps_engine,
+                        key_hash,
+                        cached_latents,
+                        cached_step_latents,
+                        meta_pairs,
+                        final_engine=None,
+                        steps_engine=steps_engine,
                     )
 
             self._evict_if_needed(tensor_bytes)
@@ -395,7 +397,9 @@ class DiTCacheStore:
             )
 
     def _lmcache_put_entry_with_lock(
-        self, key_hash: str, final_latent: torch.Tensor,
+        self,
+        key_hash: str,
+        final_latent: torch.Tensor,
         step_latents: list[StepLatentData] | None,
         meta_pairs: torch.Tensor | None,
         final_engine: Any | None = None,
@@ -409,15 +413,18 @@ class DiTCacheStore:
         If only one engine is provided, all data goes to it (backward compat).
         """
         max_retries = 5
-        backoff = 1.0
 
         def _put_with_retry(engine, key: str, tensor: torch.Tensor) -> bool:
+            backoff = 1.0
             for attempt in range(max_retries):
                 if engine.put(key, tensor):
                     return True
                 logger.info(
                     "LMCache put retry %d/%d for %s (waiting %.1fs)",
-                    attempt + 1, max_retries, key[:24], backoff,
+                    attempt + 1,
+                    max_retries,
+                    key[:24],
+                    backoff,
                 )
                 time.sleep(backoff)
                 backoff = min(backoff * 2, 30.0)
@@ -566,10 +573,7 @@ class DiTCacheStore:
                         and entry.cache_key.num_inference_steps < required_num_inference_steps
                     ):
                         continue
-                    if (
-                        required_num_frames is not None
-                        and entry.cache_key.num_frames != required_num_frames
-                    ):
+                    if required_num_frames is not None and entry.cache_key.num_frames != required_num_frames:
                         continue
                 if entry.image_embedding is not None and entry.clip_embedding is not None:
                     hybrid_row_idxs.append(row_idx)
@@ -704,13 +708,13 @@ class DiTCacheStore:
                     match_type,
                     best_key_hash[:8],
                     best_t2t,
-                best_t2i,
-                best_penalty,
-                best_sim,
-                threshold,
-                self._hits,
-                self._misses,
-            )
+                    best_t2i,
+                    best_penalty,
+                    best_sim,
+                    threshold,
+                    self._hits,
+                    self._misses,
+                )
             return latents, step_latents, best_sim, cached_prompt, match_type
 
     def get_step_latents(
@@ -1082,7 +1086,8 @@ class DiTCacheStore:
         try:
             path = self._final_disk_dir / f"{key_hash}.pt"
             torch.save(latent.cpu(), path)
-            logger.debug("Saved final latent %s to disk (%.1f MB)", key_hash[:8], latent.nelement() * latent.element_size() / _MB)
+            size_mb = latent.nelement() * latent.element_size() / _MB
+            logger.debug("Saved final latent %s to disk (%.1f MB)", key_hash[:8], size_mb)
         except Exception as e:
             logger.warning("Failed to save final latent %s: %s", key_hash[:8], e)
 
@@ -1111,6 +1116,7 @@ class DiTCacheStore:
     def _is_rank0() -> bool:
         """Check if this process is rank 0 (or single-process)."""
         import torch.distributed as dist
+
         return not dist.is_initialized() or dist.get_rank() == 0
 
 

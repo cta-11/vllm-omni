@@ -51,10 +51,10 @@ class CompositeCacheBackend(InterRequestCacheBackend):
     def __init__(self, config: Any):
         super().__init__(config)
         from vllm_omni.diffusion.cache.cache_dit_backend import CacheDiTBackend
+
         self._cache_dit_backend = CacheDiTBackend(config)
         logger.info(
-            "CompositeCacheBackend initialized: inter_request + cache_dit "
-            "(Fn=%d, Bn=%d, warmup=%d)",
+            "CompositeCacheBackend initialized: inter_request + cache_dit (Fn=%d, Bn=%d, warmup=%d)",
             config.Fn_compute_blocks,
             config.Bn_compute_blocks,
             config.max_warmup_steps,

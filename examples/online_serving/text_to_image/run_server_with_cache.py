@@ -171,7 +171,8 @@ def main():
     parser.add_argument("--cache-backend", default="inter_request")
     parser.add_argument("--persistent-cache-dir", default="./persistent_cache")
     parser.add_argument(
-        "--lmcache-disk-dir", default=None,
+        "--lmcache-disk-dir",
+        default=None,
         help="LMCache disk directory for CPU→Disk tiering.",
     )
     parser.add_argument("--lmcache-max-cpu-gb", type=float, default=5.0)
