@@ -782,9 +782,7 @@ class DiffusionModelRunner(OmniConnectorModelRunnerMixin):
             # Exact-hit requests are removed from the batch and their cached
             # outputs are returned directly; semantic hits set resume_from_step.
             original_reqs = reqs
-            inter_request_outputs, reqs = self.cache_backend.short_circuit_requests(
-                reqs, target_device=self.device
-            )
+            inter_request_outputs, reqs = self.cache_backend.short_circuit_requests(reqs, target_device=self.device)
 
             # If all requests were exact hits, skip forward entirely.
             if not reqs:
@@ -850,8 +848,11 @@ class DiffusionModelRunner(OmniConnectorModelRunnerMixin):
 
             # Inter-request cache: store computed outputs for future reuse.
             outputs = self.cache_backend.post_forward_store(
-                reqs, outputs, target_device=self.device,
-                runner=self, is_dummy=is_dummy,
+                reqs,
+                outputs,
+                target_device=self.device,
+                runner=self,
+                is_dummy=is_dummy,
             )
             self.cache_backend.after_diffuse(is_dummy=is_dummy)
 
@@ -865,8 +866,8 @@ class DiffusionModelRunner(OmniConnectorModelRunnerMixin):
 
             runner_cache_dit_enabled = self.cache_backend is not None and self.cache_backend.is_enabled()
             if (
-                od_config.cache_backend
-                in ("cache_dit", "inter_request+cache_dit", "cache_dit+inter_request")                and od_config.enable_cache_dit_summary
+                od_config.cache_backend in ("cache_dit", "inter_request+cache_dit", "cache_dit+inter_request")
+                and od_config.enable_cache_dit_summary
                 and (runner_cache_dit_enabled or is_request_scoped_cache_dit_enabled(self.pipeline))
             ):
                 cache_summary(self.pipeline, details=True)

@@ -64,17 +64,19 @@ class InterRequestCacheBackend(CacheBackend):
         lmcache_disk_dir = getattr(config, "inter_request_lmcache_disk_dir", None)
         if lmcache_disk_dir:
             import torch as _torch
-            from lmcache.v1.ec_engine import ECCacheEngine
-            from lmcache.v1.config import LMCacheEngineConfig
             from lmcache.v1.cache_engine import LMCacheMetadata
+            from lmcache.v1.config import LMCacheEngineConfig
+            from lmcache.v1.ec_engine import ECCacheEngine
 
             cpu_gb = getattr(config, "inter_request_lmcache_max_cpu_gb", 5.0)
             disk_gb = getattr(config, "inter_request_lmcache_max_disk_gb", 100.0)
 
             lc_metadata = LMCacheMetadata(
                 model_name="vllm_omni_diffusion",
-                world_size=1, local_world_size=1,
-                worker_id=0, local_worker_id=0,
+                world_size=1,
+                local_world_size=1,
+                worker_id=0,
+                local_worker_id=0,
                 kv_dtype=_torch.float32,
                 kv_shape=(1, 1, 1, 1, 1),
             )
@@ -87,8 +89,10 @@ class InterRequestCacheBackend(CacheBackend):
 
             self._lmcache_engine = ECCacheEngine(
                 config=LMCacheEngineConfig.from_defaults(
-                    local_cpu=True, max_local_cpu_size=cpu_gb,
-                    local_disk=steps_dir, max_local_disk_size=disk_gb,
+                    local_cpu=True,
+                    max_local_cpu_size=cpu_gb,
+                    local_disk=steps_dir,
+                    max_local_disk_size=disk_gb,
                     save_decode_cache=True,
                 ),
                 metadata=lc_metadata,
@@ -96,9 +100,9 @@ class InterRequestCacheBackend(CacheBackend):
             )
             self._lmcache_steps_engine = self._lmcache_engine
             logger.info(
-                "LMCache ECCacheEngine initialized for step latents: "
-                "steps_dir=%s, cpu_gb=%.1f",
-                steps_dir, cpu_gb,
+                "LMCache ECCacheEngine initialized for step latents: steps_dir=%s, cpu_gb=%.1f",
+                steps_dir,
+                cpu_gb,
             )
         else:
             self._lmcache_engine = None
@@ -273,6 +277,7 @@ class InterRequestCacheBackend(CacheBackend):
             return None
         try:
             from PIL import Image
+
             img = image_tensor[0].float().cpu()  # [3, H, W]
             img = (img - img.min()) / (img.max() - img.min() + 1e-8)
             img = (img * 255).clamp(0, 255).to(torch.uint8)
@@ -359,8 +364,7 @@ class InterRequestCacheBackend(CacheBackend):
 
     def shutdown(self) -> None:
         logger.info(
-            "InterRequestCacheBackend shutdown: persistent_cache_dir=%s, "
-            "lmcache_enabled=%s, cache_size=%d",
+            "InterRequestCacheBackend shutdown: persistent_cache_dir=%s, lmcache_enabled=%s, cache_size=%d",
             self._persistent_cache_dir,
             self._lmcache_engine is not None,
             self._cache_store.size,
@@ -469,9 +473,7 @@ class InterRequestCacheBackend(CacheBackend):
     # These encapsulate the runner logic so the runner can call every
     # backend uniformly without isinstance() checks.
     # ------------------------------------------------------------------
-    def short_circuit_requests(
-        self, reqs: list, target_device: Any
-    ) -> tuple[list, list]:
+    def short_circuit_requests(self, reqs: list, target_device: Any) -> tuple[list, list]:
         """Inspect requests before forward.
 
         Returns (hit_outputs, remaining_reqs) where hit_outputs is a list of
@@ -519,7 +521,9 @@ class InterRequestCacheBackend(CacheBackend):
                         req.sampling_params.resume_from_step = clip_resume_step
                         logger.info(
                             "CLIP semantic match: similarity=%.4f, resuming from step %d/%d",
-                            clip_sim, clip_resume_step, total_steps,
+                            clip_sim,
+                            clip_resume_step,
+                            total_steps,
                         )
             remaining_reqs.append(req)
         return hit_outputs, remaining_reqs
@@ -543,9 +547,7 @@ class InterRequestCacheBackend(CacheBackend):
         # The recorder's resume_from_step survives across forward(); use it to
         # detect whether this batch was a resume. req.sampling_params may have
         # been reset by the pipeline between short_circuit and here.
-        recorder_resumed = (
-            self._recorder is not None and self._recorder.resume_from_step > 0
-        )
+        recorder_resumed = self._recorder is not None and self._recorder.resume_from_step > 0
         for req, output in zip(reqs, outputs):
             if output.output is None or is_dummy:
                 continue
@@ -561,21 +563,27 @@ class InterRequestCacheBackend(CacheBackend):
                     for r in self._recorder.records
                 ]
             cache_key_hash = self.store(req, output.output, step_latents=step_latents_data)
-            logger.info("STORE_DEBUG: hash=%s output_shape=%s resumed=%s",
-                        cache_key_hash,
-                        output.output.shape if hasattr(output.output, "shape") else "N/A",
-                        recorder_resumed)
+            logger.info(
+                "STORE_DEBUG: hash=%s output_shape=%s resumed=%s",
+                cache_key_hash,
+                output.output.shape if hasattr(output.output, "shape") else "N/A",
+                recorder_resumed,
+            )
             if cache_key_hash is not None:
                 output.custom_output["cache_key_hash"] = cache_key_hash
                 if runner is not None and hasattr(runner, "_update_cache_image_embedding"):
                     runner._update_cache_image_embedding(cache_key_hash, output.output)
-            logger.info("Inter-request cache: stored DiT output for future reuse (step_latents=%s)",
-                        "skipped(resumed)" if recorder_resumed else f"{len(step_latents_data) if step_latents_data else 0} steps")
+            if recorder_resumed:
+                steps_desc = "skipped(resumed)"
+            else:
+                steps_desc = f"{len(step_latents_data) if step_latents_data else 0} steps"
+            logger.info(
+                "Inter-request cache: stored DiT output for future reuse (step_latents=%s)",
+                steps_desc,
+            )
         return outputs
 
-    def merge_hit_outputs(
-        self, outputs: list, hit_outputs: list
-    ) -> list:
+    def merge_hit_outputs(self, outputs: list, hit_outputs: list) -> list:
         """Merge cache-hit outputs back into their original positions."""
         if not hit_outputs:
             return outputs

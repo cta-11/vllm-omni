@@ -42,7 +42,12 @@ def _frames_to_mp4_base64(frames: np.ndarray, fps: int = 24) -> str:
         import imageio
 
         # Debug: log frame info
-        logger.info("Encoding video: %d frames, shape=%s dtype=%s", len(frames), frames[0].shape if frames else None, frames[0].dtype if frames else None)
+        logger.info(
+            "Encoding video: %d frames, shape=%s dtype=%s",
+            len(frames),
+            frames[0].shape if frames else None,
+            frames[0].dtype if frames else None,
+        )
 
         buf = io.BytesIO()
         writer = imageio.get_writer(buf, format="mp4", fps=fps, codec="libx264")
@@ -113,7 +118,6 @@ class VideoCacheHandler(BaseHTTPRequestHandler):
         fps = req.get("fps", 24)
         guidance_scale = req.get("guidance_scale", 4.0)
         guidance_scale_high = req.get("guidance_scale_high")
-        flow_shift = req.get("flow_shift")
         resume_from_step = req.get("resume_from_step", 0) or 0
 
         prompt_dict = {"prompt": prompt}
@@ -201,9 +205,10 @@ def main():
     parser.add_argument("--cache-backend", default="inter_request")
     parser.add_argument("--persistent-cache-dir", default="./persistent_cache_video")
     parser.add_argument(
-        "--lmcache-disk-dir", default=None,
+        "--lmcache-disk-dir",
+        default=None,
         help="LMCache disk directory for CPU→Disk tiering. When set, latent "
-             "tensors are stored via LMCache ECCacheEngine with built-in LRU.",
+        "tensors are stored via LMCache ECCacheEngine with built-in LRU.",
     )
     parser.add_argument("--lmcache-max-cpu-gb", type=float, default=5.0)
     parser.add_argument("--lmcache-max-disk-gb", type=float, default=100.0)

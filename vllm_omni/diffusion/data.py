@@ -617,7 +617,8 @@ class DiffusionCacheConfig:
     force_refresh_step_policy: str = "once"
     # Inter-request cache parameters [inter_request only]
     inter_request_max_entries: int = 100
-    inter_request_max_memory_gb: float = 0.0  # DiTCacheStore CPU hot-cache budget; 0=shell-only mode (latents in LMCache)
+    # DiTCacheStore CPU hot-cache budget; 0 = shell-only mode (latents in LMCache)
+    inter_request_max_memory_gb: float = 0.0
     inter_request_record_step_latents: bool = False
     inter_request_step_latents_dir: str = "./step_latents"
     inter_request_persistent_cache_dir: str | None = None
